@@ -1,0 +1,1352 @@
+{
+  "name": "LinkedIn Auto-Poster: Trending + Brain Dump",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "YOUR_PHONE_NUMBER",
+        "textBody": "=🎉 *Your LinkedIn post is LIVE!*\n\nPosted successfully via {{ $('Store Post Data').item.json.source === 'braindump' ? 'Brain Dump' : 'Trending Topics' }} mode.\n\n📝 Post preview:\n{{ $('Store Post Data').item.json.postContent.substring(0, 500) }}",
+        "additionalFields": {}
+      },
+      "id": "8fa54af6-0f28-4590-a905-9aa158619e47",
+      "name": "Success Notification (WhatsApp)",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3952,
+        48
+      ],
+      "webhookId": "success-notif",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "person": "=YOUR_LINKEDIN_PERSON_ID",
+        "text": "={{ $('Store Post Data').item.json.postContent }}\n",
+        "shareMediaCategory": "IMAGE",
+        "additionalFields": {}
+      },
+      "id": "03c75f6d-5650-47c5-a6f5-92b5cd2455f9",
+      "name": "LinkedIn POST",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        3712,
+        48
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "LinkedIn account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://image.pollinations.ai/prompt/{{ encodeURIComponent($('Parse Image Prompt').item.json.imagePrompt) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "image/jpeg"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3472,
+        160
+      ],
+      "id": "52622a84-e53c-4ca1-9c3f-2b6034be6e2b",
+      "name": "Generate Image (Pollinations Fallback)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "check-sdxl-ok",
+              "leftValue": "={{ $binary.data ? $binary.data.mimeType : ($json.headers ? $json.headers['content-type'] : '') }}",
+              "rightValue": "image",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8fff80ab-61c7-4c52-9026-a3b9426ff889",
+      "name": "SDXL Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3232,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HUGGINGFACE_TOKEN"
+            },
+            {
+              "name": "Accept",
+              "value": "image/jpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"inputs\": $json.imagePrompt,\n  \"parameters\": {\n    \"negative_prompt\": $json.negativePrompt,\n    \"num_inference_steps\": 40,\n    \"guidance_scale\": 7.5\n  }\n}) }}\n",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2992,
+        48
+      ],
+      "id": "8f45417c-10f1-44b3-9b09-5bc79d8500eb",
+      "name": "Generate Image (SDXL)",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "parse-prompt-1",
+              "name": "imagePrompt",
+              "value": "={{ JSON.parse($json.content.parts[0].text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim()).prompt }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-prompt-2",
+              "name": "negativePrompt",
+              "value": "={{ JSON.parse($json.content.parts[0].text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim()).negative_prompt }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c37408e9-c363-4125-9e34-2158861be155",
+      "name": "Parse Image Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2752,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an expert AI image prompt engineer. Given this LinkedIn post:\n\n\"\"\"\n{{ $('Store Post Data').item.json.postContent }}\n\"\"\"\n\nCreate a single, detailed image generation prompt that:\n- Visually represents the core message and key concept of the post\n- Uses a modern, corporate-tech aesthetic with clean floating 3D elements\n- Includes style descriptors: isometric, vibrant professional colors, soft studio lighting, 8k resolution\n- Is optimized for Stable Diffusion XL\n- Does NOT include any text, words, letters, watermarks, or signatures in the image\n- Includes a negative prompt section\n\nReturn your response in this exact JSON format:\n{\"prompt\": \"your detailed image prompt here\", \"negative_prompt\": \"text, words, letters, watermark, signature, ugly, blurry, deformed\"}\n\nReturn ONLY the JSON, nothing else."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "You are an expert AI image prompt engineer. Always respond with valid JSON only."
+        }
+      },
+      "id": "b5a4f7f9-9338-4e70-ba3d-66a56a69afe7",
+      "name": "AI Image Prompt Generator",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        2512,
+        48
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "YOUR_PHONE_NUMBER",
+        "textBody": "=⚠️ *Maximum regeneration attempts reached (3/3).*\n\nHere is your final post:\n\n{{ $json.postContent }}\n\nPlease copy and post it manually if you'd like.",
+        "additionalFields": {}
+      },
+      "id": "04af5580-2932-472f-9d64-da30527781c4",
+      "name": "Max Attempts (WhatsApp)",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2992,
+        592
+      ],
+      "webhookId": "44841986-99bd-4c24-a91e-6befeda81495",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "inc-1",
+              "name": "regenerationCount",
+              "value": "={{ $('Track Regeneration').item.json.regenerationCount + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "inc-2",
+              "name": "postContent",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "inc-3",
+              "name": "source",
+              "value": "={{ $('Track Regeneration').item.json.source }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "626b5066-82cd-4493-83ee-b9ad7e692018",
+      "name": "Update After Regen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3232,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HUGGINGFACE_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"Qwen/Qwen2.5-72B-Instruct\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a professional LinkedIn content creator. The user REJECTED your previous post. Create a COMPLETELY DIFFERENT LinkedIn post. Previous rejected post was:\\n\\n\" + $json.postContent + \"\\n\\nThis is regeneration attempt \" + ($json.regenerationCount + 1) + \". Make it 150-250 words with 3-5 hashtags. Use a DIFFERENT angle, tone, and hook. Return ONLY the post text.\"\n    }\n  ],\n  \"max_tokens\": 600,\n  \"temperature\": 0.9\n}) }}\n",
+        "options": {}
+      },
+      "id": "baba7b86-711b-48b7-bf61-f8b4c284871a",
+      "name": "HF - Regenerate Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2992,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "limit-check",
+              "leftValue": "={{ $json.regenerationCount }}",
+              "rightValue": "3",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4ebe93b3-cf21-4d6f-8dd7-3dcc79924899",
+      "name": "Check Regen Limit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "regen-1",
+              "name": "regenerationCount",
+              "value": "={{ $('Store Post Data').item.json.regenerationCount }}",
+              "type": "number"
+            },
+            {
+              "id": "regen-2",
+              "name": "postContent",
+              "value": "={{ $('Store Post Data').item.json.postContent }}",
+              "type": "string"
+            },
+            {
+              "id": "regen-3",
+              "name": "source",
+              "value": "={{ $('Store Post Data').item.json.source }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dd797b6f-47dd-4af6-a329-cee1abe07b90",
+      "name": "Track Regeneration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2512,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-approve",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "830f9382-a6be-4591-af23-2451388ff482",
+      "name": "Action: Approve?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "a63878a1-7814-4556-9e22-61bdde77086d",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        256
+      ],
+      "webhookId": "linkedin-approval-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "YOUR_PHONE_NUMBER",
+        "textBody": "=📱 *New LinkedIn Post Draft*\n{{ $json.regenerationCount > 0 ? '🔄 Attempt #' + ($json.regenerationCount + 1) + '\\n' : '' }}\n{{ $json.postContent }}\n\n━━━━━━━━━━━━━━━━━━━━\n✅ Approve: {{ $execution.resumeUrl }}?action=approve\n🔄 Reject & Regenerate: {{ $execution.resumeUrl }}?action=reject\n{{ $json.regenerationCount >= 2 ? '⚠️ Last attempt' : '' }}",
+        "additionalFields": {}
+      },
+      "id": "bd6c35e1-4af0-4690-b993-eb4af227c9f8",
+      "name": "Send for Approval (WhatsApp)",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        256
+      ],
+      "webhookId": "99b07e48-2286-4b42-bf21-e0bd81ed64ed",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-merge-bd-1",
+              "name": "postContent",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "id-merge-bd-2",
+              "name": "source",
+              "value": "braindump",
+              "type": "string"
+            },
+            {
+              "id": "id-merge-bd-3",
+              "name": "regenerationCount",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ef4257a2-5b4c-4393-b9d6-184b7f17a087",
+      "name": "Normalize (Brain Dump)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HUGGINGFACE_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"Qwen/Qwen2.5-72B-Instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a strict ghostwriter. Your ONLY job is to rephrase the exact thoughts provided. YOU MUST NOT add any new facts, achievements, credentials, companies, or projects. If they are learning a tool, you only write about learning that tool. If you invent a CRM or any other system, you have failed.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Transform these thoughts into a short LinkedIn post:\\n\\n\" + $('Store Brain Dump Data').first().json.brainDump + \"\\n\\n\" + ($json.regenerationCount > 0 ? \"\\nNOTE: Write a NEW version of the thoughts above. Try a different hook, but stay 100% faithful to the facts.\\n\" : \"\") + \"\\nInclude 3-5 hashtags. Do not add filler.\"\n    }\n  ],\n  \"max_tokens\": 400,\n  \"temperature\": 0.2\n}) }}",
+        "options": {}
+      },
+      "id": "029f91c5-d013-42a3-aeca-a9a103526302",
+      "name": "HF - Generate from Brain Dump",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1232,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "YOUR_PHONE_NUMBER",
+        "textBody": "=✅ Got it! Rethink your idea and send a new brain dump whenever you're ready.",
+        "additionalFields": {}
+      },
+      "id": "47a78007-3d9b-47f4-88c8-dc525247ec7f",
+      "name": "Rethink Response",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1232,
+        720
+      ],
+      "webhookId": "73dcd101-59a5-4d37-b8cb-9b915f79c2e6",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-proceed",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "proceed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b27085dd-0edf-4f00-91d4-ffc08c093d8b",
+      "name": "Proceed or Rethink?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        992,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "f9d5b870-2ec1-48fd-ad8c-eede9b5859ea",
+      "name": "Wait for Feedback Decision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        752,
+        560
+      ],
+      "webhookId": "brain-dump-feedback-decision"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "YOUR_PHONE_NUMBER",
+        "textBody": "=💡 *AI Idea Analysis*\n\n{{ $json.aiAnalysis }}\n\n━━━━━━━━━━━━━━━━━━━━\n✅ Proceed with this idea: {{ $execution.resumeUrl }}?action=proceed\n🔄 Rethink (I'll send a new idea): {{ $execution.resumeUrl }}?action=rethink",
+        "additionalFields": {}
+      },
+      "id": "f576738c-cd76-4bd3-948d-1138095c0dbc",
+      "name": "Send Feedback (WhatsApp)",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        512,
+        560
+      ],
+      "webhookId": "brain-dump-feedback-wa",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "store-dump-1",
+              "name": "brainDump",
+              "value": "={{ $('Brain Dump Webhook POST').item.json.body.entry[0].changes[0].value.messages[0].text.body }}",
+              "type": "string"
+            },
+            {
+              "id": "store-dump-2",
+              "name": "aiAnalysis",
+              "value": "={{ $json.content.parts[0].text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ee22ad17-4179-477c-a120-d2e25f6cf0ed",
+      "name": "Store Brain Dump Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        512,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a LinkedIn content strategist specializing in tech and AI.\n\nA user has brain-dumped the following raw thoughts:\n\n\"\"\"\n{{ $json.body.entry[0].changes[0].value.messages[0].text.body }}\n\"\"\"\n\nAnalyze this idea and provide:\n1. **Quality Score** (1-10): How LinkedIn-worthy is this idea?\n2. **Strengths**: What's compelling about this idea? (1-2 sentences)\n3. **Improvements**: How could the idea be stronger? (1-2 sentences)\n4. **Verdict**: PROCEED or RETHINK\n\nKeep your analysis under 200 words. Be honest but encouraging."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "You are an expert content strategist who evaluates ideas for LinkedIn posts. Be concise and direct."
+        }
+      },
+      "id": "b2f3d90b-5fb2-4f54-b7fd-ce9c9a7ab1e2",
+      "name": "AI Idea Analyst",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        560
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "has-text-message",
+              "leftValue": "={{ $json.body.entry[0].changes[0].value.messages ? $json.body.entry[0].changes[0].value.messages[0].type : '' }}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b19bde39-6684-42bb-a5f7-5de522a21210",
+      "name": "Is Incoming Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        32,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "id": "3a5f2148-c76d-41f1-8636-76cb5d4c9039",
+      "name": "Acknowledge Message",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "id": "dc4c2ad4-22b7-4fa3-b243-9a8536bf6ee5",
+      "name": "Respond to Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-brain-dump",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f58cee01-ceda-4f7e-95c4-569da22ab12a",
+      "name": "Brain Dump Webhook POST",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        736
+      ],
+      "webhookId": "whatsapp-incoming-messages"
+    },
+    {
+      "parameters": {
+        "path": "whatsapp-brain-dump",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "48c3e1c1-9645-4d71-98de-b5444ef5e539",
+      "name": "Brain Dump Webhook GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        560
+      ],
+      "webhookId": "whatsapp-incoming-messages"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-merge-1",
+              "name": "postContent",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "id-merge-2",
+              "name": "source",
+              "value": "trending",
+              "type": "string"
+            },
+            {
+              "id": "id-merge-3",
+              "name": "regenerationCount",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e7196080-8cb7-4172-b212-2c820f6f4f74",
+      "name": "Normalize (Trending)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HUGGINGFACE_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"Qwen/Qwen2.5-72B-Instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a strict, factual LinkedIn content creator. You only write about the provided topic and NEVER hallucinate personal achievements.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Look at these 3 trending topics:\\n\\n\" + $('Gemini Research').first().json.content.parts[0].text + \"\\n\\nThe user selected Topic #\" + $('Wait for Topic Selection').first().json.query.topic + \". \\n\" + ($json.regenerationCount > 0 ? \"\\nNOTE: The user requested a regeneration. Try a different angle on the EXACT SAME topic.\\n\" : \"\") + \"\\nWrite a 150-200 word LinkedIn post ONLY about that selected topic. Include 3-5 relevant hashtags. Return ONLY the post text.\"\n    }\n  ],\n  \"max_tokens\": 500,\n  \"temperature\": 0.2\n}) }}",
+        "options": {}
+      },
+      "id": "9340ebdf-3694-4dac-803f-1b4cd7a6da5f",
+      "name": "HF - Generate from Topic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        800,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "responseCode": "={{ 200 }}",
+        "options": {}
+      },
+      "id": "360f3e6c-9bf7-446a-aa01-bd72932f6090",
+      "name": "Wait for Topic Selection",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        560,
+        48
+      ],
+      "webhookId": "linkedin-topic-selection"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "YOUR_PHONE_NUMBER",
+        "textBody": "=🧠 *Here are 3 trending topics today! Which one should I write a post about?*\n{{ $json.content.parts[0].text.substring(0, 3500) }}\n\nTap your choice:\n👉 Topic 1: {{ $execution.resumeUrl }}?topic=1\n👉 Topic 2: {{ $execution.resumeUrl }}?topic=2\n👉 Topic 3: {{ $execution.resumeUrl }}?topic=3",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        48
+      ],
+      "id": "17c79993-7e3e-42f2-9e77-a59734030699",
+      "name": "Send Topics (WhatsApp)",
+      "webhookId": "df51630e-e9b9-42b5-a418-39051e80b546",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Use Google Search to find 3 trending news items from the **last 7 days** in these niches: AI Agents, Mobile Dev (Flutter/React Native), Backend Architecture, Graphic Design, or Career Growth for Engineers.\n\n**Rules:**\n- Pick exactly 3 topics from different niches\n- Keep each topic to 2-3 sentences MAX\n- Format as numbered list: 1. [Topic Title] - [Brief description]\n- Total response must be under 800 characters\n- Do NOT add extra commentary or questions"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "You are a real-time LinkedIn Content Strategist."
+        }
+      },
+      "id": "129c5ae3-56a1-4d9c-ac2c-3f85ec668b1f",
+      "name": "Gemini Research",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        48
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9,12,17 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "9fe4d282-72d3-400d-9dc2-8a8ee6c47d46",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "id": "ack-non-message-001",
+      "name": "Acknowledge Non-Message",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "store-pc-1",
+              "name": "postContent",
+              "value": "={{ $json.postContent }}",
+              "type": "string"
+            },
+            {
+              "id": "store-pc-2",
+              "name": "source",
+              "value": "={{ $json.source }}",
+              "type": "string"
+            },
+            {
+              "id": "store-pc-3",
+              "name": "regenerationCount",
+              "value": "={{ $json.regenerationCount }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "store-post-data-001",
+      "name": "Store Post Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1552,
+        256
+      ]
+    }
+  ],
+  "connections": {
+    "LinkedIn POST": {
+      "main": [
+        [
+          {
+            "node": "Success Notification (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image (Pollinations Fallback)": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn POST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SDXL Success?": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn POST",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Image (Pollinations Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image (SDXL)": {
+      "main": [
+        [
+          {
+            "node": "SDXL Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Image Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Image (SDXL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Image Prompt Generator": {
+      "main": [
+        [
+          {
+            "node": "Parse Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update After Regen": {
+      "main": [
+        [
+          {
+            "node": "Store Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HF - Regenerate Content": {
+      "main": [
+        [
+          {
+            "node": "Update After Regen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Regen Limit": {
+      "main": [
+        [
+          {
+            "node": "HF - Regenerate Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Max Attempts (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Regeneration": {
+      "main": [
+        [
+          {
+            "node": "Check Regen Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action: Approve?": {
+      "main": [
+        [
+          {
+            "node": "AI Image Prompt Generator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Track Regeneration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [
+          {
+            "node": "Action: Approve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send for Approval (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize (Brain Dump)": {
+      "main": [
+        [
+          {
+            "node": "Store Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HF - Generate from Brain Dump": {
+      "main": [
+        [
+          {
+            "node": "Normalize (Brain Dump)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proceed or Rethink?": {
+      "main": [
+        [
+          {
+            "node": "HF - Generate from Brain Dump",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rethink Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Feedback Decision": {
+      "main": [
+        [
+          {
+            "node": "Proceed or Rethink?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Feedback (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Feedback Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Brain Dump Data": {
+      "main": [
+        [
+          {
+            "node": "Send Feedback (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Idea Analyst": {
+      "main": [
+        [
+          {
+            "node": "Store Brain Dump Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Incoming Text?": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acknowledge Non-Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge Message": {
+      "main": [
+        [
+          {
+            "node": "AI Idea Analyst",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brain Dump Webhook POST": {
+      "main": [
+        [
+          {
+            "node": "Is Incoming Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brain Dump Webhook GET": {
+      "main": [
+        [
+          {
+            "node": "Respond to Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize (Trending)": {
+      "main": [
+        [
+          {
+            "node": "Store Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HF - Generate from Topic": {
+      "main": [
+        [
+          {
+            "node": "Normalize (Trending)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Topic Selection": {
+      "main": [
+        [
+          {
+            "node": "HF - Generate from Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Topics (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Topic Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Research": {
+      "main": [
+        [
+          {
+            "node": "Send Topics (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Gemini Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Post Data": {
+      "main": [
+        [
+          {
+            "node": "Send for Approval (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

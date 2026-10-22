@@ -1,0 +1,330 @@
+{
+  "name": "Combined Apify Google Maps Lead Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup — read before running\n\n1. **Apify token** — get it from https://console.apify.com/account/integrations and paste it into the \"Search Parameters\" node (`apifyToken` field).\n2. **Search Parameters** node — configure all fields:\n   - `searchQuery`: what to search (e.g. \"restaurants\", \"software agencies\")\n   - `location`: where to search (e.g. \"New York, USA\")\n   - `maxResults`: max places to scrape (keep ≤100 for sync mode)\n   - `websiteFilter`: \"allPlaces\" | \"withWebsite\" | \"withoutWebsite\"\n     → Tip: use \"withoutWebsite\" to find businesses that need a site — prime leads!\n   - `language`: result language (default \"en\")\n   - `onlyWithContact`: if true, only keeps leads that have a phone, email, or website\n3. **Google Sheets** node:\n   - Connect your Google Sheets credential (select/create in the node after import)\n   - Replace `documentId` with your actual Sheet ID (the long string in the sheet's URL)\n   - Create a sheet tab named \"Leads\" with header row:\n     Business Name | Category | Address | City | State | Postal Code | Country | Phone | Email | Website | Google Maps URL | Rating | Reviews Count | Facebook | Instagram | LinkedIn | Has Website | Search Query | Search Location | Scraped At\n4. **Outputs**: This workflow produces BOTH:\n   - Google Sheets append (only leads WITH a phone number)\n   - Downloadable CSV file (ALL cleaned leads)\n5. Click \"Execute workflow\" to run manually, or replace the Manual Trigger with a Schedule Trigger for automation.\n\n⚠️ This uses Apify's synchronous endpoint. Fine for up to ~100-150 results. For bigger scrapes, switch to the async Apify node pattern.",
+        "height": 580,
+        "width": 460
+      },
+      "id": "sticky-setup",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "apifyToken",
+              "value": "YOUR_APIFY_API_TOKEN",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "searchQuery",
+              "value": "restaurants",
+              "type": "string"
+            },
+            {
+              "id": "p3",
+              "name": "location",
+              "value": "New York, USA",
+              "type": "string"
+            },
+            {
+              "id": "p4",
+              "name": "maxResults",
+              "value": 50,
+              "type": "number"
+            },
+            {
+              "id": "p5",
+              "name": "websiteFilter",
+              "value": "allPlaces",
+              "type": "string"
+            },
+            {
+              "id": "p6",
+              "name": "language",
+              "value": "en",
+              "type": "string"
+            },
+            {
+              "id": "p7",
+              "name": "onlyWithContact",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-params",
+      "name": "Search Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $json.apifyToken }}"
+            },
+            {
+              "name": "clean",
+              "value": "true"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "maxItems",
+              "value": "={{ $json.maxResults }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ searchStringsArray: [$json.searchQuery], locationQuery: $json.location, maxCrawledPlacesPerSearch: Number($json.maxResults), language: $json.language, website: $json.websiteFilter, skipClosedPlaces: true, scrapeContacts: true, scrapePlaceDetailPage: false, scrapeDirectories: false, maxReviews: 0, maxImages: 0 }) }}",
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "http-apify",
+      "name": "Run Apify Google Maps Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize Apify results, extract useful lead fields, and remove duplicates.\nconst incoming = $input.all();\nconst config = $('Search Parameters').first().json;\nlet records = [];\n\n// Unwrap the Apify response — handle every known shape.\nfor (const item of incoming) {\n  const value = item.json;\n  if (Array.isArray(value)) {\n    records.push(...value);\n  } else if (Array.isArray(value?.data)) {\n    records.push(...value.data);\n  } else if (Array.isArray(value?.items)) {\n    records.push(...value.items);\n  } else if (Array.isArray(value?.results)) {\n    records.push(...value.results);\n  } else if (Array.isArray(value?.output)) {\n    records.push(...value.output);\n  } else if (value && typeof value === 'object' && (value.title || value.name || value.placeId)) {\n    // Looks like a single place object\n    records.push(value);\n  } else if (value && typeof value === 'object') {\n    // Unknown wrapper — try all array-valued keys\n    const arrayKey = Object.keys(value).find(k => Array.isArray(value[k]));\n    if (arrayKey) records.push(...value[arrayKey]);\n    else records.push(value);\n  }\n}\n\nfunction str(v) {\n  if (v === undefined || v === null) return '';\n  if (typeof v === 'string') return v;\n  if (typeof v === 'number' || typeof v === 'boolean') return String(v);\n  if (Array.isArray(v)) return v.map(str).filter(Boolean).join(', ');\n  if (typeof v === 'object') return v.email || v.phone || v.url || v.link || JSON.stringify(v);\n  return String(v);\n}\n\nfunction firstStr(...values) {\n  for (const value of values) {\n    if (Array.isArray(value) && value.length) return str(value[0]);\n    if (value !== undefined && value !== null && value !== '') return str(value);\n  }\n  return '';\n}\n\nfunction listStr(value) {\n  if (!value) return '';\n  if (Array.isArray(value)) {\n    return value.map(v => str(v)).filter(Boolean).join(', ');\n  }\n  return str(value);\n}\n\nconst normalized = records.map(place => {\n  if (!place || typeof place !== 'object') return null;\n\n  const emails = firstStr(\n    place.email,\n    place.emails,\n    place.contactDetails?.emails,\n    place.companyContacts?.emails\n  );\n\n  const phones = firstStr(\n    place.phone,\n    place.phoneNumber,\n    place.phones,\n    place.contactDetails?.phones\n  );\n\n  const facebook = firstStr(\n    place.facebook,\n    place.facebookUrl,\n    place.socials?.facebook,\n    place.contactDetails?.facebook\n  );\n\n  const instagram = firstStr(\n    place.instagram,\n    place.instagramUrl,\n    place.socials?.instagram,\n    place.contactDetails?.instagram\n  );\n\n  const linkedin = firstStr(\n    place.linkedin,\n    place.linkedinUrl,\n    place.socials?.linkedin,\n    place.contactDetails?.linkedin\n  );\n\n  const websiteVal = firstStr(place.website, place.url?.includes?.('google') ? '' : place.url);\n\n  return {\n    businessName: firstStr(place.title, place.name),\n    category: firstStr(place.categoryName, place.category, place.categories),\n    address: firstStr(place.address, place.street),\n    city: firstStr(place.city),\n    state: firstStr(place.state),\n    postalCode: firstStr(place.postalCode, place.zip),\n    country: firstStr(place.countryCode, place.country),\n    phone: listStr(phones),\n    email: listStr(emails),\n    website: String(websiteVal || ''),\n    googleMapsUrl: firstStr(place.url, place.placeUrl),\n    rating: firstStr(place.totalScore, place.rating),\n    reviewsCount: firstStr(place.reviewsCount, place.numberOfReviews),\n    facebook: listStr(facebook),\n    instagram: listStr(instagram),\n    linkedin: listStr(linkedin),\n    hasWebsite: websiteVal ? 'Yes' : 'No',\n    searchQuery: config.searchQuery || '',\n    searchLocation: config.location || '',\n    scrapedAt: new Date().toISOString()\n  };\n}).filter(Boolean);\n\nconst filtered = normalized.filter(lead => {\n  if (!lead.businessName) return false;\n  if (!config.onlyWithContact) return true;\n  return Boolean(lead.phone || lead.email || lead.website);\n});\n\nconst seen = new Set();\nconst unique = filtered.filter(lead => {\n  const key = [\n    String(lead.businessName || '').toLowerCase().trim(),\n    String(lead.phone || '').toLowerCase().trim(),\n    String(lead.website || '').toLowerCase().trim()\n  ].join('|');\n\n  if (seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n\nif (unique.length === 0) {\n  const debugInfo = {\n    incomingItems: incoming.length,\n    rawRecords: records.length,\n    afterNormalize: normalized.length,\n    afterFilter: filtered.length,\n    sampleRaw: records.length > 0 ? JSON.stringify(Object.keys(records[0])).substring(0, 200) : 'none'\n  };\n  throw new Error(\n    'No leads survived cleaning. Debug: ' + JSON.stringify(debugInfo) +\n    '. Check that the Apify scraper returned results and the response format is correct.'\n  );\n}\n\nreturn unique.map(lead => ({ json: lead }));"
+      },
+      "id": "code-clean",
+      "name": "Clean and Deduplicate Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-phone",
+      "name": "Filter - Has Phone",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Business Name": "={{ $json.businessName }}",
+            "Category": "={{ $json.category }}",
+            "Address": "={{ $json.address }}",
+            "City": "={{ $json.city }}",
+            "State": "={{ $json.state }}",
+            "Postal Code": "={{ $json.postalCode }}",
+            "Country": "={{ $json.country }}",
+            "Phone": "={{ $json.phone }}",
+            "Email": "={{ $json.email }}",
+            "Website": "={{ $json.website }}",
+            "Google Maps URL": "={{ $json.googleMapsUrl }}",
+            "Rating": "={{ $json.rating }}",
+            "Reviews Count": "={{ $json.reviewsCount }}",
+            "Facebook": "={{ $json.facebook }}",
+            "Instagram": "={{ $json.instagram }}",
+            "LinkedIn": "={{ $json.linkedin }}",
+            "Has Website": "={{ $json.hasWebsite }}",
+            "Search Query": "={{ $json.searchQuery }}",
+            "Search Location": "={{ $json.searchLocation }}",
+            "Scraped At": "={{ $json.scrapedAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "gsheets-append",
+      "name": "Append to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1400,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Produce a downloadable CSV file in the execution output.\nconst rows = $input.all().map(item => item.json);\n\nif (!rows.length) {\n  throw new Error('No leads were returned. Try another search term/location or disable onlyWithContact.');\n}\n\nconst headers = [\n  'businessName', 'category', 'address', 'city', 'state', 'postalCode',\n  'country', 'phone', 'email', 'website', 'googleMapsUrl', 'rating',\n  'reviewsCount', 'facebook', 'instagram', 'linkedin', 'hasWebsite',\n  'searchQuery', 'searchLocation', 'scrapedAt'\n];\n\nconst escapeCsv = value => {\n  const text = value === undefined || value === null ? '' : String(value);\n  return `\"${text.replace(/\"/g, '\"\"')}\"`;\n};\n\nconst csv = [\n  headers.map(escapeCsv).join(','),\n  ...rows.map(row => headers.map(key => escapeCsv(row[key])).join(','))\n].join('\\n');\n\nconst stamp = new Date().toISOString().replace(/[:.]/g, '-');\n\nreturn [{\n  json: {\n    leadCount: rows.length,\n    fileName: `apify-leads-${stamp}.csv`,\n    message: 'Open the Binary tab and download the CSV file.'\n  },\n  binary: {\n    data: {\n      data: Buffer.from(csv, 'utf8').toString('base64'),\n      mimeType: 'text/csv',\n      fileName: `apify-leads-${stamp}.csv`,\n      fileExtension: 'csv'\n    }\n  }\n}];"
+      },
+      "id": "code-csv",
+      "name": "Create CSV File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Search Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Parameters": {
+      "main": [
+        [
+          {
+            "node": "Run Apify Google Maps Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Apify Google Maps Scraper": {
+      "main": [
+        [
+          {
+            "node": "Clean and Deduplicate Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean and Deduplicate Leads": {
+      "main": [
+        [
+          {
+            "node": "Filter - Has Phone",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create CSV File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter - Has Phone": {
+      "main": [
+        [
+          {
+            "node": "Append to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

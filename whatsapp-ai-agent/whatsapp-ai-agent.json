@@ -1,0 +1,1309 @@
+{
+  "name": "WhatsApp Multimodal AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "1eb813a8-d578-45d0-80c0-2be767931479",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "position": [
+        2256,
+        3120
+      ],
+      "webhookId": "d3978cae-2aca-4553-8ac7-ab89068deabc",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "7cd748b9-6504-4a20-998e-2b541717cd3d",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3680,
+        3152
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "9ce0bf5b-09da-4b4a-80ca-63cb02377b0c",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3680,
+        2848
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "You are an intelligent assistant. Your purpose is to analyze various types of input and provide helpful, accurate responses.\n\nCAPABILITIES:\n- Process and respond to text messages\n- Analyze uploaded files\n- Interpret and describe images\n- Transcribe and understand voice messages\n\nINPUT HANDLING:\n1. For text messages: Analyze the content, understand the intent, and provide a relevant response.\n2. For file analysis: Examine the file content, extract key information, and summarize important points also based on the questions asked.\n3. For image analysis: Describe what you see in the image, identify key elements, and respond to any questions about the image.\n4. For voice messages: Transcribe the audio, understand the message, and respond appropriately.\n\nRESPONSE GUIDELINES:\n- Be concise but thorough\n- Prioritize accuracy over speculation\n- Maintain a professional and helpful tone\n- When uncertain, acknowledge limitations\n- Format responses for easy reading on mobile devices\n- Include actionable information when appropriate\n\nLIMITATIONS:\n- Mention if you're unable to process certain file formats\n- Indicate if an image is unclear or if details are difficult to discern\n- Note if audio quality impacts transcription accuracy\n\nSECURITY & PRIVACY:\n- Do not store or remember sensitive information shared in files, images, or voice notes\n- Do not share personal information across different user interactions\n- Inform users about data privacy limitations when relevant\n\nAnalyze all inputs carefully before responding. Your goal is to provide value through accurate information and helpful assistance."
+        }
+      },
+      "id": "883f325e-d8a7-4059-9001-b723d047c216",
+      "name": "AI Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        3120,
+        4256
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "7711d977-8753-437c-97d4-03c3bf314716",
+      "name": "Download File",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3680,
+        3488
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "id": "081cb52c-f3c7-476d-8b65-560cd76303a1",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        3936,
+        3488
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=memory_{{ $('WhatsApp Trigger').first().json.contacts[0].wa_id }}",
+        "contextWindowLength": 10
+      },
+      "id": "e1b7e97d-f08c-4d64-b74f-98844de36885",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        3264,
+        4480
+      ],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $('WhatsApp Trigger').first().json.messages[0].document.id }}"
+      },
+      "id": "00f5083c-0344-4ab7-95e6-3572618e0655",
+      "name": "Get File Url",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        3456,
+        3488
+      ],
+      "webhookId": "280bd5de-32d7-4d8f-93d2-e91e3b0bc161",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f52d2aaa-e0b2-45e5-8c4b-ceef42182a0d",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.messages[0].document.mime_type }}",
+              "rightValue": "application/pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "options": {},
+      "id": "fb4d54d1-cfa2-44e8-9b3a-0e1988c84855",
+      "name": "Only PDF File",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        3184,
+        3520
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  if (item.binary) {\n    const binaryPropertyNames = Object.keys(item.binary);\n    for (const propName of binaryPropertyNames) {\n      if (item.binary[propName].mimeType === 'audio/mp3') {\n        item.binary[propName].mimeType = 'audio/mpeg';\n      }\n    }\n  }\n}\n\nreturn $input.all();"
+      },
+      "id": "fdf6641f-a1aa-4cee-a934-25e5d5419882",
+      "name": "Fix mimeType for Audio",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4000,
+        4112
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').first().json.messages[0].from }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "id": "caea08e7-8e98-46b2-a6f7-f53d1f2b4050",
+      "name": "Send message",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        3808,
+        4400
+      ],
+      "webhookId": "23834751-5066-48ba-8e19-549680df2b27",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $('Input type').first().json.contacts[0].wa_id }}",
+        "messageType": "audio",
+        "mediaPath": "useMedian8n",
+        "additionalFields": {}
+      },
+      "id": "e589ed1b-b607-40df-9707-acfd4fb1854b",
+      "name": "Send audio",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        4224,
+        4112
+      ],
+      "webhookId": "d18b2c98-84e4-43cf-a532-0c47d5161684",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').first().json.messages[0].from }}",
+        "textBody": "=Sorry but you can only send PDF files",
+        "additionalFields": {}
+      },
+      "id": "184bca37-e663-4dcc-9d3b-8d12d099fd7c",
+      "name": "Incorrect format",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        3504,
+        3776
+      ],
+      "webhookId": "23834751-5066-48ba-8e19-549680df2b27",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c53cd9f9-77c1-4331-98ff-bfc9bdf95a3c",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $('WhatsApp Trigger').first().json.messages[0].text.body }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60474612-34d9-442d-9166-c86bf9d6c286",
+      "name": "Text",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4208,
+        2512
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "219577d5-b028-48fc-90be-980f4171ab68",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3e904685-97ef-48f7-9876-cc9f32a0d7a8",
+      "name": "Audio",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4208,
+        2848
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67552183-de2e-494a-878e-c2948e8cb6bb",
+              "name": "text",
+              "type": "string",
+              "value": "=User request on the image:\n{{ \"Describe the following image\" || $('WhatsApp Trigger').first().json.messages[0].image.caption }}\n\nImage description:\n{{ $json.content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0296adca-fa31-4cae-8cc4-5d5b1ba5b4ae",
+      "name": "Image",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4176,
+        3152
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67552183-de2e-494a-878e-c2948e8cb6bb",
+              "name": "text",
+              "type": "string",
+              "value": "=User request on the file:\n{{ \"Describe this file\" || $('Only PDF File').first().json.messages[0].document.caption }}\n\nFile content:\n{{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4ca58def-60da-49c5-abe3-2810b7d545f7",
+      "name": "File",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4208,
+        3488
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').first().json.messages[0].from }}",
+        "textBody": "=You can only send text messages, images, audio files and PDF documents.",
+        "additionalFields": {}
+      },
+      "id": "1b85db64-7415-43a7-929f-e06dae1dc8cc",
+      "name": "Not supported",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        2720,
+        3456
+      ],
+      "webhookId": "23834751-5066-48ba-8e19-549680df2b27",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $('WhatsApp Trigger').first().json.messages[0].image.id }}"
+      },
+      "id": "f28f08dd-666d-4d4f-a5fb-ff2a2f37cb1b",
+      "name": "Get Image Url",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        3440,
+        3152
+      ],
+      "webhookId": "280bd5de-32d7-4d8f-93d2-e91e3b0bc161",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $('WhatsApp Trigger').first().json.messages[0].audio.id }}"
+      },
+      "id": "f8d3d2ef-38ef-4f0b-9fc8-c52810efcc5a",
+      "name": "Get Audio Url",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [
+        3424,
+        2848
+      ],
+      "webhookId": "87caa300-7204-47b5-959a-94f4a8fbf8cf",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b9d1d759-f585-4791-a743-b9d72951e77c",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('WhatsApp Trigger').first().json.messages[0].audio }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "68309618-037a-454e-8686-cd36ce36135d",
+      "name": "From audio to audio?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        3536,
+        4256
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "08fd0c80-307e-4f45-b1de-35192ee4ec5e",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.messages[0].text.body }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "b7b64446-f1ea-4622-990c-22f3999a8269",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.messages[0].audio }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Voice"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "202af928-a324-411a-bf15-68a349e7bf9e",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.messages[0].image }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c63299e9-6069-4bc6-afb9-7beebf6e3d69",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.messages[0].document }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Document"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "fcb3d55c-584f-4e78-9904-3f4c78db991d",
+      "name": "Input type",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        2544,
+        3072
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "content": "## Text",
+        "height": 240,
+        "width": 1340
+      },
+      "id": "9e848cf6-091c-4c60-9d99-f1cd75fed048",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3088,
+        2480
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Voice",
+        "height": 240,
+        "width": 1340
+      },
+      "id": "d446490a-2f68-4235-9106-7b2d0ef618c0",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3088,
+        2800
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Image",
+        "height": 80,
+        "width": 1340
+      },
+      "id": "fff9d34d-7752-4b56-b375-537ad3f09b61",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3088,
+        3120
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Document",
+        "height": 240,
+        "width": 1340
+      },
+      "id": "b2052e5c-acc9-4e70-b2f1-07fa9839520e",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3088,
+        3456
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Response",
+        "height": 600,
+        "width": 1340,
+        "color": 5
+      },
+      "id": "1d84f009-a597-422b-9098-1630a3d3e0d8",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3088,
+        4000
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## NEW: Logging & CRM\n\n**Google Sheets**: Replace YOUR_GOOGLE_SHEET_URL_HERE with your sheet URL\n**Chatwoot**: Replace YOUR_CHATWOOT_DOMAIN, YOUR_ACCOUNT_ID, YOUR_INBOX_ID, and YOUR_CHATWOOT_API_TOKEN with your values",
+        "height": 240,
+        "width": 1340,
+        "color": 3
+      },
+      "id": "12103818-88fb-4e05-adee-55f1cd083840",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3088,
+        4640
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "How to obtain Whatsapp API?\n\n\n### Prerequisites\nBefore you begin, make sure you have:\n- A Meta Business Account\n- A Facebook Developer Account\n- A Verified Business\n- A Phone Number to link to WhatsApp\n- Access to Meta's Graph API Explorer or Meta for Developers portal\n\n### STEP 1: Create a Meta App\n1. Go to https://developers.facebook.com/apps\n2. Click Create App\n3. Choose Business as the app type, then click Next\n4. Give your app a name and enter a contact email\n5. Choose your Business Account (or create one)\n6. Click Create App\n\n### STEP 2: Add WhatsApp Product\n1. In your app dashboard, scroll down to Add a Product\n2. Find WhatsApp and click Set Up\n3. Link your Business Manager Account\n\n### STEP 3: Create a WhatsApp Business Account (if needed)\n1. If you haven't already, go to https://business.facebook.com/\n2. Click Create Account and complete your business information\n3. Go to Business Settings > Accounts > WhatsApp Accounts\n4. Add a Phone Number (you'll receive a verification code)\n\n### STEP 4: Generate a Temporary Access Token (for development)\n1. In the App Dashboard, go to WhatsApp > Getting Started\n2. Choose your test phone number\n3. Copy the temporary access token (valid for 24 hours)\n4. Copy the Phone Number ID and WhatsApp Business Account ID\n\n### STEP 5: Set Up a Webhook URL (n8n)\n1. In n8n, set up a Webhook node (or use the WhatsApp Trigger node)\n2. Copy the webhook URL\n3. In the Meta Developer Dashboard go to WhatsApp > Configuration\n4. Click Edit Callback URL\n5. Paste your n8n webhook URL and add a random verify token\n6. In n8n, configure your webhook to respond to the verification request",
+        "height": 2680,
+        "width": 780,
+        "color": 3
+      },
+      "id": "a997b012-c5b7-4e3b-a3ef-a6a14c662f86",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1376,
+        1888
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_URL",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_URL"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "displayName": "Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User Message",
+              "displayName": "User Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Response",
+              "displayName": "AI Response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2966eeaa-c23e-4b85-a1aa-c93a8609baec",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        3536,
+        4688
+      ],
+      "typeVersion": 4.4
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_CHATWOOT_DOMAIN/api/v1/accounts/YOUR_ACCOUNT_ID/contacts/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $('WhatsApp Trigger').first().json.messages[0].from }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_API_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e5845d11-8281-495d-85ca-bb50511824c4",
+      "name": "Chatwoot: Find Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3776,
+        4688
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst phone = $('WhatsApp Trigger').first().json.messages[0].from;\nconst name = $('WhatsApp Trigger').first().json.contacts[0].profile.name || phone;\n\nconst contacts = data.payload || [];\nconst existing = contacts.find(c => c.phone_number === ('+' + phone));\n\nreturn [{\n  json: {\n    contact_id: existing ? existing.id : null,\n    phone: phone,\n    name: name,\n    contact_exists: existing ? true : false\n  }\n}];"
+      },
+      "id": "ab528137-6e3a-42fe-a888-77e0e149ac4c",
+      "name": "Chatwoot: Contact Exists?",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4000,
+        4688
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "chatwoot-contact-condition",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.contact_exists }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6b88763-5b1b-446c-aa36-772eef944aab",
+      "name": "Chatwoot: New Contact?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        4224,
+        4688
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_CHATWOOT_DOMAIN/api/v1/accounts/YOUR_ACCOUNT_ID/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_API_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $('Chatwoot: Contact Exists?').first().json.name }}\",\n  \"phone_number\": \"+{{ $('Chatwoot: Contact Exists?').first().json.phone }}\"\n}",
+        "options": {}
+      },
+      "id": "a3dea002-97d4-476c-99d2-2e8c10b6e1d2",
+      "name": "Chatwoot: Create Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        4432,
+        4784
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const triggerData = $('WhatsApp Trigger').first().json;\nconst phone = triggerData.messages[0].from;\nconst msg = triggerData.messages[0];\n\nlet userMessage = '[unknown]';\nif (msg.text) userMessage = msg.text.body;\nelse if (msg.image) userMessage = '[image] ' + (msg.image.caption || '');\nelse if (msg.audio) userMessage = '[voice note]';\nelse if (msg.document) userMessage = '[file] ' + (msg.document.filename || '');\n\nconst aiResponse = $('AI Agent1').first().json.output;\n\nlet contactId;\nconst existingContactNode = $('Chatwoot: Contact Exists?').first().json;\n\nif (existingContactNode && existingContactNode.contact_exists) {\n    contactId = existingContactNode.contact_id;\n} else {\n    const newNode = $('Chatwoot: Create Contact').first().json;\n    contactId = newNode.id;\n}\n\nreturn [{\n  json: {\n    contact_id: contactId,\n    user_message: userMessage,\n    ai_response: aiResponse,\n    phone: phone\n  }\n}];"
+      },
+      "id": "5451fcfa-fba3-4c3e-9acf-f635084f995b",
+      "name": "Chatwoot: Merge Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4672,
+        4688
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_CHATWOOT_DOMAIN/api/v1/accounts/YOUR_ACCOUNT_ID/conversations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_API_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inbox_id\": YOUR_INBOX_ID,\n  \"contact_id\": {{ $json.contact_id }},\n  \"additional_attributes\": {\n    \"phone\": \"{{ $json.phone }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "842d4540-8b94-456b-90aa-381186025274",
+      "name": "Chatwoot: Create Conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        4880,
+        4688
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_CHATWOOT_DOMAIN/api/v1/accounts/YOUR_ACCOUNT_ID/conversations/{{ $json.id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_API_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"Customer: {{ $('Chatwoot: Merge Data').first().json.user_message }}\\n\\nBot reply: {{ $('Chatwoot: Merge Data').first().json.ai_response }}\",\n  \"message_type\": \"outgoing\",\n  \"private\": true\n}",
+        "options": {}
+      },
+      "id": "0f236349-fd33-4eb5-b640-64740abec18e",
+      "name": "Chatwoot: Log Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        5104,
+        4688
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        3120,
+        4448
+      ],
+      "id": "77f595d9-ecf4-49aa-9beb-2735142aff43",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        3888,
+        3152
+      ],
+      "id": "0d236343-e5c6-45f0-a0be-5fdf893a60be",
+      "name": "Analyze an image"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "whisper-large-v3"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3888,
+        2848
+      ],
+      "id": "d0727b02-f8f3-4d78-b6e9-3c77977c6ced",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/YOUR_ELEVENLABS_VOICE_ID",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "YOUR_NEW_ELEVENLABS_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"={{ $('AI Agent1').first().json.output }}\",\n  \"model_id\": \"eleven_multilingual_v2\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3760,
+        4176
+      ],
+      "id": "5c5a789c-d3fe-47ee-adda-31883f8eee61",
+      "name": "HTTP Request1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Input type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "From audio to audio?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Url": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only PDF File": {
+      "main": [
+        [
+          {
+            "node": "Get File Url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fix mimeType for Audio": {
+      "main": [
+        [
+          {
+            "node": "Send audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audio": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image Url": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Audio Url": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From audio to audio?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input type": {
+      "main": [
+        [
+          {
+            "node": "Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Audio Url",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Image Url",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Only PDF File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image": {
+      "main": [
+        [
+          {
+            "node": "Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Fix mimeType for Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}
