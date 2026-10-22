@@ -8,12 +8,6 @@ Production-style AI automation workflows built with [n8n](https://n8n.io), combi
 | [LinkedIn Auto-Poster](./linkedin-auto-poster) | Researches trending topics or turns your own ideas into LinkedIn posts with AI images, with human approval over WhatsApp before anything is published | Gemini 2.5 Flash, Qwen 2.5 72B (Hugging Face), Stable Diffusion XL, LinkedIn API |
 | [Google Maps Lead Scraper](./google-maps-lead-scraper) | Scrapes businesses from Google Maps, cleans and deduplicates them, and exports leads to Google Sheets and CSV | Apify, JavaScript, Google Sheets |
 
-## Screenshots
-
-> Add a screenshot of each workflow canvas here, for example:
->
-> `![WhatsApp AI Agent](./whatsapp-ai-agent/screenshot.png)`
-
 ## How to use
 
 1. In n8n, go to **Workflows → Import from File** and pick the `.json` file from a folder.
